@@ -64,7 +64,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func createMainWindow() {
-        let window = NSWindow(
+        let window = VortexWindow(
             contentRect: NSRect(x: 140, y: 120, width: 430, height: 460),
             styleMask: [.borderless, .fullSizeContentView],
             backing: .buffered,
@@ -141,5 +141,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return defaultValue
         }
         return defaults.double(forKey: key)
+    }
+}
+
+final class VortexWindow: NSWindow {
+    override var canBecomeKey: Bool {
+        true
+    }
+
+    override var canBecomeMain: Bool {
+        true
     }
 }

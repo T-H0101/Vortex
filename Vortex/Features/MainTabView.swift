@@ -13,6 +13,7 @@ struct MainTabView: View {
     @ObservedObject var edgeDocking: EdgeDockingController
     @StateObject private var taskViewModel = TaskSupervisorViewModel()
     @StateObject private var activityViewModel = ActivityMonitorViewModel()
+    @State private var visibleReminder: InAppReminder?
 
     @AppStorage("dockPreference") private var dockPreferenceRaw = DockSide.right.rawValue
     @AppStorage("launchDocked") private var launchDocked = true
@@ -23,8 +24,11 @@ struct MainTabView: View {
     @AppStorage("returnToDockDelaySeconds") private var returnToDockDelaySeconds = 1.2
     @AppStorage("dockAnimationDuration") private var dockAnimationDuration = 0.24
     @AppStorage("activityRefreshInterval") private var activityRefreshInterval = 8.0
-    @AppStorage("recentAppsLimit") private var recentAppsLimit = 12
-    @AppStorage("recentWebPagesLimit") private var recentWebPagesLimit = 12
+    @AppStorage("recentAppsLimit") private var recentAppsLimit = 100
+    @AppStorage("recentWebPagesLimit") private var recentWebPagesLimit = 100
+    @AppStorage("capsuleOpacity") private var capsuleOpacity = 0.76
+    @AppStorage("glassTintHex") private var glassTintHex = "#F4F7FF"
+    @AppStorage("glassTintOpacity") private var glassTintOpacity = 0.26
     @AppStorage("appLanguage") private var appLanguage = "zh-Hans"
 
     @Environment(\.modelContext) private var modelContext
@@ -45,12 +49,10 @@ struct MainTabView: View {
         .frame(width: edgeDocking.contentSize.width, height: edgeDocking.contentSize.height)
         .background {
             if edgeDocking.expansionState == .expanded {
-                visualEffect
+                glassBackground(material: .underWindowBackground, tintOpacity: glassTintOpacity)
             } else {
-                ZStack {
-                    VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
-                    Color.black.opacity(0.22)
-                }
+                glassBackground(material: .hudWindow, tintOpacity: max(0.12, glassTintOpacity * 0.8))
+                    .opacity(capsuleOpacity)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -58,6 +60,18 @@ struct MainTabView: View {
             if edgeDocking.expansionState == .expanded {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(Color.white.opacity(0.18), lineWidth: 0.8)
+            }
+        }
+        .overlay {
+            if let visibleReminder {
+                InAppReminderView(reminder: visibleReminder)
+                    .padding(24)
+                    .transition(.scale(scale: 0.94).combined(with: .opacity))
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            self.visibleReminder = nil
+                        }
+                    }
             }
         }
         .shadow(
@@ -84,6 +98,9 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .vortexShowSettings)) { _ in
             selectedTab = .settings
             edgeDocking.expandWindow()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .vortexReminderDelivered)) { notification in
+            showInAppReminder(from: notification)
         }
         .onChange(of: dockPreferenceRaw) { _, _ in
             applySettingsToDocking()
@@ -114,8 +131,21 @@ struct MainTabView: View {
         }
     }
 
-    private var visualEffect: some View {
-        VisualEffectView(material: .sidebar, blendingMode: .behindWindow)
+    private func glassBackground(material: NSVisualEffectView.Material, tintOpacity: Double) -> some View {
+        ZStack {
+            VisualEffectView(material: material, blendingMode: .behindWindow)
+            Color(hex: glassTintHex)
+                .opacity(tintOpacity)
+            LinearGradient(
+                colors: [
+                    .white.opacity(0.16),
+                    .white.opacity(0.04),
+                    .black.opacity(0.05)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
     }
 
     private var headerBar: some View {
@@ -187,8 +217,9 @@ struct MainTabView: View {
                     activityRefreshInterval: $activityRefreshInterval,
                     recentAppsLimit: $recentAppsLimit,
                     recentWebPagesLimit: $recentWebPagesLimit,
-                    onDockNow: { side in edgeDocking.dock(to: side) },
-                    onExpandWindow: { edgeDocking.expandWindow() }
+                    capsuleOpacity: $capsuleOpacity,
+                    glassTintHex: $glassTintHex,
+                    glassTintOpacity: $glassTintOpacity
                 )
             }
         }
@@ -295,6 +326,66 @@ struct MainTabView: View {
 
     private func L(_ zh: String, _ en: String) -> String {
         appLanguage == "en" ? en : zh
+    }
+
+    private func showInAppReminder(from notification: Notification) {
+        let title = notification.userInfo?["title"] as? String ?? L("任务提醒", "Task Reminder")
+        let reminder = InAppReminder(title: title, message: L("该处理这个任务了", "Time to handle this task"))
+
+        withAnimation(.easeInOut(duration: 0.18)) {
+            visibleReminder = reminder
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.2) {
+            guard visibleReminder?.id == reminder.id else { return }
+            withAnimation(.easeInOut(duration: 0.18)) {
+                visibleReminder = nil
+            }
+        }
+    }
+}
+
+private struct InAppReminder: Identifiable, Equatable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
+
+private struct InAppReminderView: View {
+    let reminder: InAppReminder
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "bell.badge.fill")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundColor(.yellow)
+
+            Text("Task Reminder")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.secondary)
+
+            Text(reminder.title)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+
+            Text(reminder.message)
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 18)
+        .frame(maxWidth: 320)
+        .background(
+            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.22), lineWidth: 0.8)
+        )
+        .shadow(color: .black.opacity(0.32), radius: 18, x: 0, y: 8)
     }
 }
 
@@ -483,6 +574,7 @@ struct TaskRowCompact: View {
     private func reminderLabel(_ frequency: TaskReminderFrequency, appLanguage: String) -> String {
         switch frequency {
         case .none: return appLanguage == "en" ? "No reminder" : "不提醒"
+        case .fiveSeconds: return appLanguage == "en" ? "Every 5s" : "每5秒"
         case .hourly: return appLanguage == "en" ? "Hourly" : "每小时"
         case .daily: return appLanguage == "en" ? "Daily" : "每天"
         case .weekly: return appLanguage == "en" ? "Weekly" : "每周"
@@ -496,13 +588,15 @@ struct TaskComposerView: View {
     let onCreate: (String, Date, TaskScheduleType, TaskPriority, TaskReminderFrequency, String) -> Void
 
     @State private var title = ""
-    @State private var dateInput = TaskComposerView.defaultDateText()
-    @State private var timeInput = TaskComposerView.defaultTimeText()
+    @State private var selectedYear = Calendar.current.component(.year, from: Date())
+    @State private var selectedMonth = Calendar.current.component(.month, from: Date())
+    @State private var selectedDay = Calendar.current.component(.day, from: Date())
+    @State private var selectedHour = Calendar.current.component(.hour, from: Date())
+    @State private var selectedMinute = Calendar.current.component(.minute, from: Date())
     @State private var scheduleType: TaskScheduleType = .oneTime
     @State private var priority: TaskPriority = .medium
     @State private var reminderFrequency: TaskReminderFrequency = .daily
     @State private var notes = ""
-    @State private var validationError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -512,12 +606,7 @@ struct TaskComposerView: View {
             TextField(L("任务标题", "Task title"), text: $title)
                 .textFieldStyle(.roundedBorder)
 
-            HStack(spacing: 10) {
-                TextField(L("日期 YYYY-MM-DD", "Date YYYY-MM-DD"), text: $dateInput)
-                    .textFieldStyle(.roundedBorder)
-                TextField(L("时间 HH:mm", "Time HH:mm"), text: $timeInput)
-                    .textFieldStyle(.roundedBorder)
-            }
+            deadlinePickerGrid
 
             Picker(L("任务类型", "Task schedule"), selection: $scheduleType) {
                 Text(L("单次截止", "Deadline")).tag(TaskScheduleType.oneTime)
@@ -534,6 +623,7 @@ struct TaskComposerView: View {
 
             Picker(L("提醒方式", "Reminder"), selection: $reminderFrequency) {
                 Text(L("无", "None")).tag(TaskReminderFrequency.none)
+                Text(L("每5秒（测试）", "Every 5 seconds (test)")).tag(TaskReminderFrequency.fiveSeconds)
                 Text(L("每小时", "Hourly")).tag(TaskReminderFrequency.hourly)
                 Text(L("每天", "Daily")).tag(TaskReminderFrequency.daily)
                 Text(L("每周", "Weekly")).tag(TaskReminderFrequency.weekly)
@@ -544,25 +634,13 @@ struct TaskComposerView: View {
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(2...4)
 
-            if let validationError {
-                Text(validationError)
-                    .font(.system(size: 11))
-                    .foregroundColor(.red)
-            }
-
             HStack {
                 Spacer()
                 Button(L("取消", "Cancel")) {
                     onCancel()
                 }
                 Button(L("添加", "Add")) {
-                    guard let dueDate = parsedDueDate else {
-                        validationError = L("时间格式不正确，请使用 YYYY-MM-DD 和 HH:mm", "Invalid date format, use YYYY-MM-DD and HH:mm")
-                        return
-                    }
-
-                    validationError = nil
-                    onCreate(title, dueDate, scheduleType, priority, reminderFrequency, notes)
+                    onCreate(title, selectedDueDate, scheduleType, priority, reminderFrequency, notes)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -585,37 +663,80 @@ struct TaskComposerView: View {
         appLanguage == "en" ? en : zh
     }
 
-    private var parsedDueDate: Date? {
-        Self.dueDateFormatter.date(from: "\(dateInput) \(timeInput)")
+    private var deadlinePickerGrid: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L("截止时间", "Due time"))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.secondary)
+
+            HStack(spacing: 8) {
+                componentPicker(L("年", "Year"), selection: $selectedYear, values: yearOptions) { "\($0)" }
+                componentPicker(L("月", "Month"), selection: $selectedMonth, values: Array(1...12)) { "\($0)" }
+                componentPicker(L("日", "Day"), selection: $selectedDay, values: Array(1...daysInSelectedMonth)) { "\($0)" }
+            }
+
+            HStack(spacing: 8) {
+                componentPicker(L("时", "Hour"), selection: $selectedHour, values: Array(0...23)) { String(format: "%02d", $0) }
+                componentPicker(L("分", "Minute"), selection: $selectedMinute, values: Array(0...59)) { String(format: "%02d", $0) }
+            }
+        }
+        .onChange(of: selectedYear) { _, _ in
+            clampSelectedDay()
+        }
+        .onChange(of: selectedMonth) { _, _ in
+            clampSelectedDay()
+        }
     }
 
-    private static let dueDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd HH:mm"
-        return formatter
-    }()
-
-    private static let defaultDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
-
-    private static let defaultTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "HH:mm"
-        return formatter
-    }()
-
-    private static func defaultDateText() -> String {
-        defaultDateFormatter.string(from: Date())
+    private func componentPicker(
+        _ title: String,
+        selection: Binding<Int>,
+        values: [Int],
+        label: @escaping (Int) -> String
+    ) -> some View {
+        Picker(title, selection: selection) {
+            ForEach(values, id: \.self) { value in
+                Text(label(value)).tag(value)
+            }
+        }
+        .pickerStyle(.menu)
+        .frame(maxWidth: .infinity)
     }
 
-    private static func defaultTimeText() -> String {
-        defaultTimeFormatter.string(from: Date().addingTimeInterval(3600))
+    private var selectedDueDate: Date {
+        var components = DateComponents()
+        components.calendar = Calendar.current
+        components.timeZone = TimeZone.current
+        components.year = selectedYear
+        components.month = selectedMonth
+        components.day = min(selectedDay, daysInSelectedMonth)
+        components.hour = selectedHour
+        components.minute = selectedMinute
+        return Calendar.current.date(from: components) ?? Date()
+    }
+
+    private var yearOptions: [Int] {
+        let currentYear = Calendar.current.component(.year, from: Date())
+        return Array(currentYear...(currentYear + 10))
+    }
+
+    private var daysInSelectedMonth: Int {
+        var components = DateComponents()
+        components.calendar = Calendar.current
+        components.timeZone = TimeZone.current
+        components.year = selectedYear
+        components.month = selectedMonth
+
+        guard let date = Calendar.current.date(from: components),
+              let range = Calendar.current.range(of: .day, in: .month, for: date) else {
+            return 31
+        }
+
+        return range.count
+    }
+
+    private func clampSelectedDay() {
+        selectedDay = min(selectedDay, daysInSelectedMonth)
     }
 }
 
@@ -824,9 +945,9 @@ struct SettingsTabView: View {
     @Binding var activityRefreshInterval: Double
     @Binding var recentAppsLimit: Int
     @Binding var recentWebPagesLimit: Int
-
-    let onDockNow: (DockSide) -> Void
-    let onExpandWindow: () -> Void
+    @Binding var capsuleOpacity: Double
+    @Binding var glassTintHex: String
+    @Binding var glassTintOpacity: Double
 
     var body: some View {
         ScrollView {
@@ -879,6 +1000,28 @@ struct SettingsTabView: View {
                     .pickerStyle(.segmented)
                 }
 
+                settingsSection(L("毛玻璃外观", "Glass Appearance")) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ColorPicker(L("玻璃颜色", "Glass tint"), selection: glassTintColor)
+
+                        HStack {
+                            Text(L("颜色透明度", "Tint opacity"))
+                            Spacer()
+                            Text(String(format: "%.0f%%", glassTintOpacity * 100))
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(value: $glassTintOpacity, in: 0.08...0.65, step: 0.01)
+
+                        HStack {
+                            Text(L("收纳态透明度", "Collapsed opacity"))
+                            Spacer()
+                            Text(String(format: "%.0f%%", capsuleOpacity * 100))
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(value: $capsuleOpacity, in: 0.35...1.0, step: 0.01)
+                    }
+                }
+
                 settingsSection(L("性能与列表", "Performance & Lists")) {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
@@ -893,22 +1036,21 @@ struct SettingsTabView: View {
                         Stepper(L("最近网页数量: \(recentWebPagesLimit)", "Recent web pages count: \(recentWebPagesLimit)"), value: $recentWebPagesLimit, in: 5...40)
                     }
                 }
-
-                HStack(spacing: 10) {
-                    Button(L("立即收纳", "Dock now")) {
-                        onDockNow(DockSide(rawValue: dockPreferenceRaw) ?? .right)
-                    }
-                    .buttonStyle(.borderedProminent)
-
-                    Button(L("立即展开", "Expand now")) {
-                        onExpandWindow()
-                    }
-                    .buttonStyle(.bordered)
-                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
         }
+    }
+
+    private var glassTintColor: Binding<Color> {
+        Binding(
+            get: { Color(hex: glassTintHex) },
+            set: { newValue in
+                if let hexString = newValue.hexString {
+                    glassTintHex = hexString
+                }
+            }
+        )
     }
 
     private func settingsSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -943,5 +1085,42 @@ struct VisualEffectView: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
         nsView.material = material
         nsView.blendingMode = blendingMode
+    }
+}
+
+private extension Color {
+    init(hex: String) {
+        let cleanedHex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var value: UInt64 = 0
+        Scanner(string: cleanedHex).scanHexInt64(&value)
+
+        let red: Double
+        let green: Double
+        let blue: Double
+
+        if cleanedHex.count == 6 {
+            red = Double((value & 0xFF0000) >> 16) / 255
+            green = Double((value & 0x00FF00) >> 8) / 255
+            blue = Double(value & 0x0000FF) / 255
+        } else {
+            red = 244 / 255
+            green = 247 / 255
+            blue = 255 / 255
+        }
+
+        self.init(red: red, green: green, blue: blue)
+    }
+
+    var hexString: String? {
+        guard let color = NSColor(self).usingColorSpace(.sRGB) else {
+            return nil
+        }
+
+        return String(
+            format: "#%02X%02X%02X",
+            Int(round(color.redComponent * 255)),
+            Int(round(color.greenComponent * 255)),
+            Int(round(color.blueComponent * 255))
+        )
     }
 }
