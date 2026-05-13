@@ -29,6 +29,7 @@ struct MainTabView: View {
     @AppStorage("capsuleOpacity") private var capsuleOpacity = 0.76
     @AppStorage("glassTintHex") private var glassTintHex = "#F4F7FF"
     @AppStorage("glassTintOpacity") private var glassTintOpacity = 0.26
+    @AppStorage("systemNotificationsEnabled") private var systemNotificationsEnabled = true
     @AppStorage("appLanguage") private var appLanguage = "zh-Hans"
 
     @Environment(\.modelContext) private var modelContext
@@ -64,14 +65,7 @@ struct MainTabView: View {
         }
         .overlay {
             if let visibleReminder {
-                InAppReminderView(reminder: visibleReminder)
-                    .padding(24)
-                    .transition(.scale(scale: 0.94).combined(with: .opacity))
-                    .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.18)) {
-                            self.visibleReminder = nil
-                        }
-                    }
+                reminderOverlay(for: visibleReminder)
             }
         }
         .shadow(
@@ -128,6 +122,18 @@ struct MainTabView: View {
         }
         .onChange(of: recentWebPagesLimit) { _, newValue in
             activityViewModel.updateRecentLimits(appLimit: recentAppsLimit, webLimit: newValue)
+        }
+        .onChange(of: systemNotificationsEnabled) { _, newValue in
+            ReminderScheduler.shared.updateSystemNotificationsEnabled(newValue)
+            if newValue {
+                Task {
+                    let status = await NotificationPermissionManager.shared.currentStatus()
+                    if status == .notDetermined {
+                        _ = await NotificationPermissionManager.shared.requestPermission()
+                    }
+                }
+            }
+            taskViewModel.fetchTasks()
         }
     }
 
@@ -219,7 +225,8 @@ struct MainTabView: View {
                     recentWebPagesLimit: $recentWebPagesLimit,
                     capsuleOpacity: $capsuleOpacity,
                     glassTintHex: $glassTintHex,
-                    glassTintOpacity: $glassTintOpacity
+                    glassTintOpacity: $glassTintOpacity,
+                    systemNotificationsEnabled: $systemNotificationsEnabled
                 )
             }
         }
@@ -227,7 +234,9 @@ struct MainTabView: View {
 
     @ViewBuilder
     private var collapsedPreview: some View {
-        if edgeDocking.dockedSide == .top {
+        if let visibleReminder {
+            collapsedReminderPreview(visibleReminder)
+        } else if edgeDocking.dockedSide == .top {
             topCollapsedPreview
         } else {
             sideCollapsedPreview
@@ -343,6 +352,76 @@ struct MainTabView: View {
             }
         }
     }
+
+    @ViewBuilder
+    private func reminderOverlay(for reminder: InAppReminder) -> some View {
+        if edgeDocking.expansionState == .expanded {
+            InAppReminderView(reminder: reminder)
+                .padding(24)
+                .transition(.scale(scale: 0.94).combined(with: .opacity))
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        visibleReminder = nil
+                    }
+                }
+        }
+    }
+
+    @ViewBuilder
+    private func collapsedReminderPreview(_ reminder: InAppReminder) -> some View {
+        if edgeDocking.dockedSide == .top {
+            HStack(spacing: 8) {
+                Image(systemName: "bell.badge.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.yellow)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(L("任务提醒", "Reminder"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.primary)
+                    Text(reminder.title)
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .onTapGesture {
+                edgeDocking.expandWindow()
+            }
+        } else {
+            VStack(spacing: 8) {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "bell.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.yellow)
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 7, height: 7)
+                        .offset(x: 3, y: -2)
+                }
+
+                Text(L("提醒", "Alert"))
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(.primary)
+
+                Text(reminder.title)
+                    .font(.system(size: 8))
+                    .foregroundColor(.secondary)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 44)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.vertical, 10)
+            .onTapGesture {
+                edgeDocking.expandWindow()
+            }
+        }
+    }
 }
 
 private struct InAppReminder: Identifiable, Equatable {
@@ -415,6 +494,12 @@ struct TaskTabView: View {
                 .padding(.horizontal, 12)
                 .padding(.top, 10)
 
+                if !viewModel.overdueTasks.isEmpty {
+                    overdueWarningBanner
+                        .padding(.horizontal, 12)
+                        .padding(.top, 8)
+                }
+
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         if viewModel.tasks.isEmpty {
@@ -479,6 +564,35 @@ struct TaskTabView: View {
         .animation(.easeInOut(duration: 0.2), value: isPresentingComposer)
     }
 
+    private var overdueWarningBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.red)
+
+            Text(L("有任务已超时", "Tasks overdue"))
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.red)
+
+            Spacer()
+
+            Text("\(viewModel.overdueTasks.count)")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.red))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.red.opacity(0.12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color.red.opacity(0.35), lineWidth: 0.8)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
     private var emptyTaskState: some View {
         VStack(spacing: 8) {
             Image(systemName: "checkmark.circle")
@@ -514,12 +628,17 @@ struct TaskRowCompact: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
+                    if task.isOverdue {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.red)
+                    }
                     Image(systemName: priorityIcon(task.priority))
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(priorityColor(task.priority))
+                        .foregroundColor(task.isOverdue ? .red : priorityColor(task.priority))
                     Text(task.title)
                         .font(.system(size: 13))
-                        .foregroundColor(task.isCompleted ? .secondary : .primary)
+                        .foregroundColor(task.isOverdue ? .red : (task.isCompleted ? .secondary : .primary))
                         .strikethrough(task.isCompleted)
                         .lineLimit(1)
                 }
@@ -527,7 +646,7 @@ struct TaskRowCompact: View {
                 HStack(spacing: 6) {
                     Text(task.formattedDueDate)
                         .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(task.isOverdue ? .red.opacity(0.85) : .secondary)
                     Text(scheduleLabel(task.scheduleType, appLanguage: appLanguage))
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
@@ -551,7 +670,11 @@ struct TaskRowCompact: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Color.primary.opacity(0.05))
+        .background(task.isOverdue ? Color.red.opacity(0.12) : Color.primary.opacity(0.05))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(task.isOverdue ? Color.red.opacity(0.35) : Color.clear, lineWidth: 0.8)
+        )
         .cornerRadius(8)
     }
 
@@ -574,6 +697,7 @@ struct TaskRowCompact: View {
     private func reminderLabel(_ frequency: TaskReminderFrequency, appLanguage: String) -> String {
         switch frequency {
         case .none: return appLanguage == "en" ? "No reminder" : "不提醒"
+        case .atDueTime: return appLanguage == "en" ? "Due time" : "到期时"
         case .fiveSeconds: return appLanguage == "en" ? "Every 5s" : "每5秒"
         case .hourly: return appLanguage == "en" ? "Hourly" : "每小时"
         case .daily: return appLanguage == "en" ? "Daily" : "每天"
@@ -595,7 +719,7 @@ struct TaskComposerView: View {
     @State private var selectedMinute = Calendar.current.component(.minute, from: Date())
     @State private var scheduleType: TaskScheduleType = .oneTime
     @State private var priority: TaskPriority = .medium
-    @State private var reminderFrequency: TaskReminderFrequency = .daily
+    @State private var reminderFrequency: TaskReminderFrequency = .atDueTime
     @State private var notes = ""
 
     var body: some View {
@@ -623,6 +747,7 @@ struct TaskComposerView: View {
 
             Picker(L("提醒方式", "Reminder"), selection: $reminderFrequency) {
                 Text(L("无", "None")).tag(TaskReminderFrequency.none)
+                Text(L("到期时", "Due time")).tag(TaskReminderFrequency.atDueTime)
                 Text(L("每5秒（测试）", "Every 5 seconds (test)")).tag(TaskReminderFrequency.fiveSeconds)
                 Text(L("每小时", "Hourly")).tag(TaskReminderFrequency.hourly)
                 Text(L("每天", "Daily")).tag(TaskReminderFrequency.daily)
@@ -948,6 +1073,8 @@ struct SettingsTabView: View {
     @Binding var capsuleOpacity: Double
     @Binding var glassTintHex: String
     @Binding var glassTintOpacity: Double
+    @Binding var systemNotificationsEnabled: Bool
+    @ObservedObject private var notificationPermission = NotificationPermissionManager.shared
 
     var body: some View {
         ScrollView {
@@ -1000,6 +1127,55 @@ struct SettingsTabView: View {
                     .pickerStyle(.segmented)
                 }
 
+                settingsSection(L("提醒", "Reminders")) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Toggle(L("允许任务使用系统级通知", "Allow task system notifications"), isOn: $systemNotificationsEnabled)
+
+                        HStack {
+                            Text(L("当前状态", "Current status"))
+                            Spacer()
+                            Text(notificationStatusText)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(notificationPermission.authorizationStatus == .denied ? .red : .secondary)
+                        }
+
+                        if notificationPermission.authorizationStatus == .denied {
+                            Text(L("已被系统拒绝，请手动到系统设置中打开。", "Denied by macOS. Open System Settings to enable it."))
+                                .font(.system(size: 11))
+                                .foregroundColor(.red.opacity(0.82))
+                        }
+
+                        HStack(spacing: 8) {
+                            Button(L("刷新状态", "Refresh status")) {
+                                Task {
+                                    _ = await notificationPermission.currentStatus()
+                                }
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button(L("请求权限", "Request access")) {
+                                Task {
+                                    _ = await notificationPermission.requestPermission()
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(notificationPermission.authorizationStatus == .authorized || notificationPermission.authorizationStatus == .provisional)
+
+                            Button(L("测试通知", "Send test notification")) {
+                                notificationPermission.sendTestNotification()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+
+                        if notificationPermission.authorizationStatus == .denied {
+                            Button(L("打开系统设置", "Open System Settings")) {
+                                notificationPermission.openNotificationSettings()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                }
+
                 settingsSection(L("毛玻璃外观", "Glass Appearance")) {
                     VStack(alignment: .leading, spacing: 10) {
                         ColorPicker(L("玻璃颜色", "Glass tint"), selection: glassTintColor)
@@ -1040,6 +1216,11 @@ struct SettingsTabView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
         }
+        .onAppear {
+            Task {
+                _ = await notificationPermission.currentStatus()
+            }
+        }
     }
 
     private var glassTintColor: Binding<Color> {
@@ -1051,6 +1232,21 @@ struct SettingsTabView: View {
                 }
             }
         )
+    }
+
+    private var notificationStatusText: String {
+        switch notificationPermission.authorizationStatus {
+        case .authorized:
+            return L("已授权", "Authorized")
+        case .provisional:
+            return L("临时授权", "Provisional")
+        case .denied:
+            return L("已拒绝", "Denied")
+        case .notDetermined:
+            return L("未决定", "Not determined")
+        @unknown default:
+            return L("未知", "Unknown")
+        }
     }
 
     private func settingsSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {

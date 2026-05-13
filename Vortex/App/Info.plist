@@ -30,5 +30,7 @@
     <string>Vortex needs access to send Apple Events for activity monitoring and window management.</string>
     <key>LSUIElement</key>
     <false/>
+    <key>NSUserNotificationAlertStyle</key>
+    <string>alert</string>
 </dict>
 </plist>

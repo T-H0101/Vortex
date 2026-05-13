@@ -24,6 +24,7 @@ enum TaskScheduleType: String, Codable, CaseIterable {
 
 enum TaskReminderFrequency: String, Codable, CaseIterable {
     case none
+    case atDueTime
     case fiveSeconds
     case hourly
     case daily
@@ -57,7 +58,7 @@ final class TaskItem {
         notes: String = "",
         priority: TaskPriority = .medium,
         scheduleType: TaskScheduleType = .oneTime,
-        reminderFrequency: TaskReminderFrequency = .daily
+        reminderFrequency: TaskReminderFrequency = .atDueTime
     ) {
         self.id = id
         self.title = title
@@ -101,7 +102,7 @@ extension TaskItem {
     }
 
     var reminderFrequency: TaskReminderFrequency {
-        get { TaskReminderFrequency(rawValue: reminderFrequencyRaw) ?? .daily }
+        get { TaskReminderFrequency(rawValue: reminderFrequencyRaw) ?? .atDueTime }
         set { reminderFrequencyRaw = newValue.rawValue }
     }
 }
