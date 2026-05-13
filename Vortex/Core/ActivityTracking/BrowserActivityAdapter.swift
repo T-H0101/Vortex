@@ -100,6 +100,8 @@ final class BrowserActivityAdapter: @unchecked Sendable {
         if error != nil { return [] }
 
         let count = result.numberOfItems
+        guard count > 0 else { return [] }
+
         for i in 1...count {
             guard let itemDescriptor = result.atIndex(i) as NSAppleEventDescriptor? else { continue }
             let itemsCount = itemDescriptor.numberOfItems

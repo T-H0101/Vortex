@@ -138,7 +138,9 @@ struct ActivityMonitorView: View {
                     .padding(.vertical, 30)
                 } else {
                     ForEach(viewModel.browserTabs) { tab in
-                        BrowserTabRow(tab: tab)
+                        BrowserTabRow(tab: tab) {
+                            viewModel.activateWebPage(tab)
+                        }
                     }
                 }
             }
@@ -228,6 +230,7 @@ struct ActivityRowView: View {
 
 struct BrowserTabRow: View {
     let tab: BrowserActivityAdapter.BrowserTab
+    let onActivate: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -253,5 +256,8 @@ struct BrowserTabRow: View {
         .padding(.vertical, 8)
         .background(Color.vortexMaterialSecondary.opacity(0.5))
         .cornerRadius(6)
+        .onTapGesture {
+            onActivate()
+        }
     }
 }
