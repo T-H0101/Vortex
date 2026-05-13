@@ -26,6 +26,7 @@ final class TaskSupervisorViewModel: ObservableObject {
 
         do {
             tasks = sortTasks(try modelContext.fetch(descriptor))
+            rescheduleActiveReminders()
         } catch {
             print("Failed to fetch tasks: \(error)")
         }
@@ -71,6 +72,8 @@ final class TaskSupervisorViewModel: ObservableObject {
         switch reminderFrequency {
         case .none:
             reminderDate = nil
+        case .fiveSeconds:
+            reminderDate = Date().addingTimeInterval(5)
         case .hourly:
             reminderDate = Date().addingTimeInterval(3600)
         case .daily, .weekly:
@@ -163,6 +166,12 @@ final class TaskSupervisorViewModel: ObservableObject {
                 return !lhs.isCompleted
             }
             return lhs.dueDate < rhs.dueDate
+        }
+    }
+
+    private func rescheduleActiveReminders() {
+        for task in tasks where !task.isCompleted {
+            ReminderScheduler.shared.scheduleReminder(for: task)
         }
     }
 }

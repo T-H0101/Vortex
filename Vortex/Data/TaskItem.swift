@@ -24,6 +24,7 @@ enum TaskScheduleType: String, Codable, CaseIterable {
 
 enum TaskReminderFrequency: String, Codable, CaseIterable {
     case none
+    case fiveSeconds
     case hourly
     case daily
     case weekly
