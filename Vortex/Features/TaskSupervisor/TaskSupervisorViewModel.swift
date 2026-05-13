@@ -47,7 +47,6 @@ final class TaskSupervisorViewModel: ObservableObject {
 
         do {
             try modelContext.save()
-            ReminderScheduler.shared.scheduleReminder(for: task)
             fetchTasks()
             newTaskTitle = ""
             isAddingTask = false
@@ -72,6 +71,8 @@ final class TaskSupervisorViewModel: ObservableObject {
         switch reminderFrequency {
         case .none:
             reminderDate = nil
+        case .atDueTime:
+            reminderDate = dueDate
         case .fiveSeconds:
             reminderDate = Date().addingTimeInterval(5)
         case .hourly:
@@ -94,7 +95,6 @@ final class TaskSupervisorViewModel: ObservableObject {
 
         do {
             try modelContext.save()
-            ReminderScheduler.shared.scheduleReminder(for: task)
             fetchTasks()
         } catch {
             print("Failed to create task: \(error)")
@@ -102,14 +102,15 @@ final class TaskSupervisorViewModel: ObservableObject {
     }
 
     func toggleTaskCompletion(_ task: TaskItem) {
-        task.isCompleted.toggle()
-        task.completedAt = task.isCompleted ? Date() : nil
-
         if task.isCompleted {
-            ReminderScheduler.shared.cancelReminder(for: task.id)
-            modelContext?.delete(task)
-        } else {
+            task.isCompleted = false
+            task.completedAt = nil
             ReminderScheduler.shared.scheduleReminder(for: task)
+        } else {
+            task.isCompleted = true
+            task.completedAt = Date()
+            ReminderScheduler.shared.cancelReminder(for: task.id)
+            scheduleDeletionAfterCompletion(for: task)
         }
 
         do {
@@ -172,6 +173,33 @@ final class TaskSupervisorViewModel: ObservableObject {
     private func rescheduleActiveReminders() {
         for task in tasks where !task.isCompleted {
             ReminderScheduler.shared.scheduleReminder(for: task)
+        }
+    }
+
+    private func scheduleDeletionAfterCompletion(for task: TaskItem) {
+        let taskId = task.id
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
+            guard let self, let modelContext = self.modelContext else { return }
+
+            let descriptor = FetchDescriptor<TaskItem>(
+                predicate: #Predicate { item in
+                    item.id == taskId
+                }
+            )
+
+            do {
+                guard let taskToDelete = try modelContext.fetch(descriptor).first,
+                      taskToDelete.isCompleted else {
+                    return
+                }
+
+                modelContext.delete(taskToDelete)
+                try modelContext.save()
+                self.fetchTasks()
+            } catch {
+                print("Failed to delete completed task after delay: \(error)")
+            }
         }
     }
 }

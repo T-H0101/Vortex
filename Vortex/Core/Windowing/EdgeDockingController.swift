@@ -162,6 +162,29 @@ final class EdgeDockingController: ObservableObject {
         updateContentSize()
     }
 
+    func reapplyCurrentPlacement() {
+        if expansionState == .collapsed {
+            collapseWindow()
+        } else {
+            expandWindow()
+        }
+    }
+
+    func enforceCurrentPlacement() {
+        guard let window, let screen = screenFor(window: window) else { return }
+
+        if expansionState == .collapsed {
+            let side = dockedSide == .none ? preferredDockSide : dockedSide
+            dockedSide = side
+            window.setFrame(collapsedFrame(for: window, side: side, in: screen.visibleFrame), display: true)
+        } else {
+            let side = dockedSide == .none ? preferredDockSide : dockedSide
+            window.setFrame(expandedFrame(for: window, side: side, in: screen.visibleFrame), display: true)
+        }
+
+        updateContentSize()
+    }
+
     private func scheduleDockEvaluation() {
         dockEvaluationWorkItem?.cancel()
 
