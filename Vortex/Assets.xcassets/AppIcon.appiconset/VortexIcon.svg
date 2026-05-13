@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="vortexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#A855F7;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="vortexGradDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4F46E5;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#7C3AED;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#9333EA;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="512" cy="512" r="480" fill="url(#vortexGradDark)"/>
+
+  <!-- Outer ring -->
+  <circle cx="512" cy="512" r="420" fill="none" stroke="url(#vortexGrad)" stroke-width="24" opacity="0.6"/>
+
+  <!-- Vortex spiral arms -->
+  <g fill="none" stroke-linecap="round">
+    <!-- Spiral arm 1 -->
+    <path d="M 512 200
+             Q 650 200 720 300
+             Q 790 400 720 500
+             Q 650 600 512 620
+             Q 374 640 300 550
+             Q 226 460 300 360
+             Q 374 260 512 280"
+          stroke="white" stroke-width="28" opacity="0.95"/>
+
+    <!-- Spiral arm 2 -->
+    <path d="M 512 824
+             Q 374 824 304 724
+             Q 234 624 304 524
+             Q 374 424 512 404
+             Q 650 384 720 484
+             Q 790 584 720 684
+             Q 650 784 512 764"
+          stroke="white" stroke-width="28" opacity="0.8"/>
+
+    <!-- Inner accent spiral -->
+    <path d="M 512 340
+             Q 580 340 620 400
+             Q 660 460 620 520
+             Q 580 580 512 600
+             Q 444 620 404 560
+             Q 364 500 404 440
+             Q 444 380 512 400"
+          stroke="white" stroke-width="18" opacity="0.6"/>
+  </g>
+
+  <!-- Center dot -->
+  <circle cx="512" cy="512" r="40" fill="white" opacity="0.95"/>
+
+  <!-- Checkmark overlay -->
+  <g transform="translate(512, 512)">
+    <path d="M -60 0 L -20 40 L 70 -50"
+          fill="none"
+          stroke="url(#vortexGradDark)"
+          stroke-width="24"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          transform="translate(-5, 5)"/>
+  </g>
+
+  <!-- Decorative dots -->
+  <circle cx="200" cy="300" r="16" fill="white" opacity="0.4"/>
+  <circle cx="824" cy="300" r="12" fill="white" opacity="0.3"/>
+  <circle cx="200" cy="724" r="12" fill="white" opacity="0.3"/>
+  <circle cx="824" cy="724" r="16" fill="white" opacity="0.4"/>
+</svg>
