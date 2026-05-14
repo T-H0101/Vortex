@@ -17,6 +17,7 @@
 		77F9C59A9808DC7B51B8FE7E /* BrowserActivityAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC2155CA61BAF23C049C54FF /* BrowserActivityAdapter.swift */; };
 		784B505D3241CCED4EA39CE9 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91BEFD12FD9932AD2F381BD4 /* Theme.swift */; };
 		8A69EE5405123D87D3DF9309 /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DB0385133D311A5E100607B /* WindowManager.swift */; };
+		911F17AF9860CEA60807FC97 /* NotificationPermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A5B383583D88A8C3CD2A015 /* NotificationPermissionManager.swift */; };
 		9E3F9F991AD44585B7AD73DD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 63C511F18558079B327C032B /* Assets.xcassets */; };
 		A5B3A59D658DE861F4F43488 /* ReminderSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7F5C8BD23FD2D4339BCBAF1 /* ReminderSchedule.swift */; };
 		EE1B851A920A143785B12B7F /* ActivityTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F44EAB6D599C15C5E93F22 /* ActivityTracker.swift */; };
@@ -36,6 +37,7 @@
 		63C511F18558079B327C032B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		77FD7F7E48E64D292AD1B72C /* ActivityMonitorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityMonitorViewModel.swift; sourceTree = "<group>"; };
 		85F5533AECFE1EF10E590C94 /* ActivityItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityItem.swift; sourceTree = "<group>"; };
+		8A5B383583D88A8C3CD2A015 /* NotificationPermissionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPermissionManager.swift; sourceTree = "<group>"; };
 		91BEFD12FD9932AD2F381BD4 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		95070FBB197065A49D2997CD /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		AEA14233C444CED070A662A1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -105,6 +107,14 @@
 			path = ActivityMonitor;
 			sourceTree = "<group>";
 		};
+		B89DA13B17372DED8779865E /* Notification */ = {
+			isa = PBXGroup;
+			children = (
+				8A5B383583D88A8C3CD2A015 /* NotificationPermissionManager.swift */,
+			);
+			path = Notification;
+			sourceTree = "<group>";
+		};
 		D8E0829EE79065A0886713A6 /* Data */ = {
 			isa = PBXGroup;
 			children = (
@@ -129,6 +139,7 @@
 			isa = PBXGroup;
 			children = (
 				3F065179C29665834D3B6D16 /* ActivityTracking */,
+				B89DA13B17372DED8779865E /* Notification */,
 				88BCD8DC38BE95ED5F46383B /* Reminder */,
 				F738EC543519791ADA1B583D /* Windowing */,
 			);
@@ -234,6 +245,7 @@
 				77F9C59A9808DC7B51B8FE7E /* BrowserActivityAdapter.swift in Sources */,
 				755FBAEE01DCAD7BE94D5E1A /* EdgeDockingController.swift in Sources */,
 				0F29F20752EC8142A6F48CFD /* MainTabView.swift in Sources */,
+				911F17AF9860CEA60807FC97 /* NotificationPermissionManager.swift in Sources */,
 				A5B3A59D658DE861F4F43488 /* ReminderSchedule.swift in Sources */,
 				F2D94F9588B9A29A02959D76 /* ReminderScheduler.swift in Sources */,
 				31AFFE0A80EFA36CB3169CC1 /* TaskItem.swift in Sources */,
