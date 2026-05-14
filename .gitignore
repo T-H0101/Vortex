@@ -1,0 +1,63 @@
+# macOS
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Xcode
+*.xcuserstate
+*.xcuserdatad
+*.xcworkspace/xcuserdata/
+**/*.xcuserstate
+**/*.xcuserdatad
+*.perspective
+*.perspectivev3
+*.pbxuser
+!*.pbxproj
+project.xcworkspace/
+xcshareddata/
+
+# Swift Package Manager
+.swiftpm/
+Packages/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+
+# CocoaPods
+Pods/
+
+# Carthage
+Carthage/
+
+# Build outputs
+*.app
+*.appex
+*.framework
+*.dylib
+*.a
+*.IPA
+*.dSYM.zip
+*.dSYM
+
+# Debug
+build/
+CMakeCache.txt
+CMakeFiles/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+
+# Node
+node_modules/
+
+# Misc
+*.md~
+.plan.md.swp
