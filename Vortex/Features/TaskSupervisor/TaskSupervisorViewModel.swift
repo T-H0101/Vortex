@@ -11,14 +11,32 @@ final class TaskSupervisorViewModel: ObservableObject {
     @Published var editingTask: TaskItem?
 
     private var modelContext: ModelContext?
+    private var modelContainerObserver: NSObjectProtocol?
 
     func setup(modelContext: ModelContext) {
         self.modelContext = modelContext
+        setupModelContainerObserver()
         fetchTasks()
+    }
+
+    private func setupModelContainerObserver() {
+        modelContainerObserver.map(NotificationCenter.default.removeObserver)
+        modelContainerObserver = NotificationCenter.default.addObserver(
+            forName: .vortexTasksChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.fetchTasks()
+            }
+        }
     }
 
     func fetchTasks() {
         guard let modelContext = modelContext else { return }
+
+        // Force the context to process any pending changes from other contexts
+        modelContext.processPendingChanges()
 
         let descriptor = FetchDescriptor<TaskItem>(
             sortBy: [SortDescriptor(\.dueDate, order: .forward)]
@@ -48,6 +66,7 @@ final class TaskSupervisorViewModel: ObservableObject {
         do {
             try modelContext.save()
             fetchTasks()
+            NotificationCenter.default.post(name: .vortexTasksChanged, object: nil)
             newTaskTitle = ""
             isAddingTask = false
         } catch {
@@ -96,6 +115,7 @@ final class TaskSupervisorViewModel: ObservableObject {
         do {
             try modelContext.save()
             fetchTasks()
+            NotificationCenter.default.post(name: .vortexTasksChanged, object: nil)
         } catch {
             print("Failed to create task: \(error)")
         }
@@ -116,6 +136,7 @@ final class TaskSupervisorViewModel: ObservableObject {
         do {
             try modelContext?.save()
             fetchTasks()
+            NotificationCenter.default.post(name: .vortexTasksChanged, object: nil)
         } catch {
             print("Failed to update task completion: \(error)")
         }
@@ -130,6 +151,7 @@ final class TaskSupervisorViewModel: ObservableObject {
         do {
             try modelContext.save()
             fetchTasks()
+            NotificationCenter.default.post(name: .vortexTasksChanged, object: nil)
         } catch {
             print("Failed to delete task: \(error)")
         }
@@ -140,6 +162,7 @@ final class TaskSupervisorViewModel: ObservableObject {
         do {
             try modelContext?.save()
             fetchTasks()
+            NotificationCenter.default.post(name: .vortexTasksChanged, object: nil)
         } catch {
             print("Failed to reschedule task: \(error)")
         }
@@ -197,9 +220,16 @@ final class TaskSupervisorViewModel: ObservableObject {
                 modelContext.delete(taskToDelete)
                 try modelContext.save()
                 self.fetchTasks()
+                NotificationCenter.default.post(name: .vortexTasksChanged, object: nil)
             } catch {
                 print("Failed to delete completed task after delay: \(error)")
             }
+        }
+    }
+
+    deinit {
+        if let modelContainerObserver {
+            NotificationCenter.default.removeObserver(modelContainerObserver)
         }
     }
 }
