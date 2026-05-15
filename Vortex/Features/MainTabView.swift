@@ -91,7 +91,6 @@ struct MainTabView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .vortexShowSettings)) { _ in
             selectedTab = .settings
-            edgeDocking.expandWindow()
         }
         .onReceive(NotificationCenter.default.publisher(for: .vortexReminderDelivered)) { notification in
             showInAppReminder(from: notification)
@@ -748,7 +747,6 @@ struct TaskComposerView: View {
             Picker(L("提醒方式", "Reminder"), selection: $reminderFrequency) {
                 Text(L("无", "None")).tag(TaskReminderFrequency.none)
                 Text(L("到期时", "Due time")).tag(TaskReminderFrequency.atDueTime)
-                Text(L("每5秒（测试）", "Every 5 seconds (test)")).tag(TaskReminderFrequency.fiveSeconds)
                 Text(L("每小时", "Hourly")).tag(TaskReminderFrequency.hourly)
                 Text(L("每天", "Daily")).tag(TaskReminderFrequency.daily)
                 Text(L("每周", "Weekly")).tag(TaskReminderFrequency.weekly)

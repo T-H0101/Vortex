@@ -16,53 +16,7 @@ final class ReminderScheduler: NSObject, @unchecked Sendable {
 
     private override init() {
         super.init()
-        print("[Vortex] ReminderScheduler init start")
         UNUserNotificationCenter.current().delegate = self
-        print("[Vortex] ReminderScheduler delegate set to self")
-
-        // Check delegate assignment
-        if UNUserNotificationCenter.current().delegate === self {
-            print("[Vortex] Delegate correctly assigned to ReminderScheduler")
-        } else {
-            print("[Vortex] WARNING: Delegate may not be correctly assigned")
-        }
-
-        // Test immediate notification on startup to verify delivery works
-        testImmediateNotification()
-    }
-
-    private func testImmediateNotification() {
-        print("[Vortex] testImmediateNotification called")
-        Task { @MainActor in
-            let status = await NotificationPermissionManager.shared.currentStatus()
-            print("[Vortex] testImmediateNotification: status = \(status.rawValue)")
-            guard status == .authorized || status == .provisional else {
-                print("[Vortex] Test notification skipped: status is \(status.rawValue)")
-                return
-            }
-
-            let content = UNMutableNotificationContent()
-            content.title = "Vortex Test"
-            content.body = "If you see this, system notifications are working!"
-            content.sound = .default
-
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 2.0, repeats: false)
-            let identifier = "vortex.immediate.test.\(UUID().uuidString)"
-            let request = UNNotificationRequest(
-                identifier: identifier,
-                content: content,
-                trigger: trigger
-            )
-
-            print("[Vortex] Scheduling immediate test notification with identifier: \(identifier)")
-            UNUserNotificationCenter.current().add(request) { error in
-                if let error = error {
-                    print("[Vortex] Immediate test notification failed: \(error)")
-                } else {
-                    print("[Vortex] Immediate test notification scheduled - check in 2 seconds")
-                }
-            }
-        }
     }
 
     func requestAuthorization() {
@@ -99,7 +53,7 @@ final class ReminderScheduler: NSObject, @unchecked Sendable {
         cancelReminder(for: task.id)
 
         if task.reminderFrequency == .fiveSeconds {
-            scheduleFiveSecondTestReminder(for: task)
+            // Five seconds is for debugging only - skip in production
             pendingNotifications[task.id] = reminderDate
             return
         }

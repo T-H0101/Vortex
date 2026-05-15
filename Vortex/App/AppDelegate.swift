@@ -3,13 +3,18 @@ import SwiftUI
 import SwiftData
 
 extension Notification.Name {
+    static let vortexShowTasks = Notification.Name("vortex.showTasks")
+    static let vortexShowActivity = Notification.Name("vortex.showActivity")
     static let vortexShowSettings = Notification.Name("vortex.showSettings")
+    static let vortexAddTask = Notification.Name("vortex.addTask")
+    static let vortexTasksChanged = Notification.Name("vortex.tasksChanged")
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var mainWindow: NSWindow?
     var modelContainer: ModelContainer?
     private var edgeDockingController: EdgeDockingController?
+    private var statusBarPanelController: StatusBarPanelController?
     private var statusItem: NSStatusItem?
     private weak var statusShowItem: NSMenuItem?
     private weak var statusPinRightItem: NSMenuItem?
@@ -32,6 +37,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusItem()
         setupModelContainer()
         createMainWindow()
+        setupStatusBarPanelController()
         observeSpaceChanges()
         observeAppActivation()
         startPersistentWindowCorrection()
@@ -49,6 +55,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             print("Failed to create ModelContainer: \(error)")
         }
+    }
+
+    @MainActor
+    private func setupStatusBarPanelController() {
+        guard let container = modelContainer else { return }
+        statusBarPanelController = StatusBarPanelController(modelContainer: container)
     }
 
     private func setupMenu() {
@@ -88,6 +100,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         item.button?.imagePosition = .imageOnly
 
         let menu = NSMenu()
+
+        // Quick Add Task
+        let addTaskItem = NSMenuItem(title: "Quick Add Task", action: #selector(quickAddTask), keyEquivalent: "")
+        addTaskItem.target = self
+        menu.addItem(addTaskItem)
+
+        // Show Tasks
+        let showTasksItem = NSMenuItem(title: "Show Tasks", action: #selector(showTasks), keyEquivalent: "")
+        showTasksItem.target = self
+        menu.addItem(showTasksItem)
+
+        // Show Activity
+        let showActivityItem = NSMenuItem(title: "Show Activity", action: #selector(showActivity), keyEquivalent: "")
+        showActivityItem.target = self
+        menu.addItem(showActivityItem)
+
+        menu.addItem(.separator())
+
+        // Show/Hide Vortex
         let showItem = NSMenuItem(title: "Show/Hide Vortex", action: #selector(toggleWindow), keyEquivalent: "")
         showItem.target = self
         menu.addItem(showItem)
@@ -168,6 +199,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         showPersistentWindow()
         edgeDockingController?.expandWindow()
         NotificationCenter.default.post(name: .vortexShowSettings, object: nil)
+    }
+
+    @objc @MainActor
+    private func quickAddTask() {
+        statusBarPanelController?.showTaskComposer()
+    }
+
+    @objc @MainActor
+    private func showTasks() {
+        statusBarPanelController?.showTaskList()
+    }
+
+    @objc @MainActor
+    private func showActivity() {
+        statusBarPanelController?.showActivity()
     }
 
     @objc private func pinToRightEdge() {

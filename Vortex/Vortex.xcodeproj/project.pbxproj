@@ -25,6 +25,7 @@
 		FAC030B3411E8E775238068E /* TaskSupervisorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A48F2D97A041A21E4C36FD /* TaskSupervisorView.swift */; };
 		FCF1B9197212F46D91BE7967 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD815E2A4D3EB27488F8B2C1 /* main.swift */; };
 		FE27B4E7CBF185BAF0CBE70D /* TaskSupervisorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B824D067E28B73E4BD1F72DD /* TaskSupervisorViewModel.swift */; };
+		A1B2C3D4E5F6071809A1B2C3 /* StatusBarPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9C8D7E6F5A4B3C2D1E0F9A8 /* StatusBarPanelController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -49,6 +50,7 @@
 		EABA2420DA818AF4DE405AE5 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		F2237F29F44A3E9BB610C30F /* EdgeDockingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeDockingController.swift; sourceTree = "<group>"; };
 		FD815E2A4D3EB27488F8B2C1 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		B9C8D7E6F5A4B3C2D1E0F9A8 /* StatusBarPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarPanelController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -163,6 +165,7 @@
 			children = (
 				F2237F29F44A3E9BB610C30F /* EdgeDockingController.swift */,
 				2DB0385133D311A5E100607B /* WindowManager.swift */,
+				B9C8D7E6F5A4B3C2D1E0F9A8 /* StatusBarPanelController.swift */,
 			);
 			path = Windowing;
 			sourceTree = "<group>";
@@ -252,6 +255,7 @@
 				FAC030B3411E8E775238068E /* TaskSupervisorView.swift in Sources */,
 				FE27B4E7CBF185BAF0CBE70D /* TaskSupervisorViewModel.swift in Sources */,
 				784B505D3241CCED4EA39CE9 /* Theme.swift in Sources */,
+				A1B2C3D4E5F6071809A1B2C3 /* StatusBarPanelController.swift in Sources */,
 				8A69EE5405123D87D3DF9309 /* WindowManager.swift in Sources */,
 				FCF1B9197212F46D91BE7967 /* main.swift in Sources */,
 			);

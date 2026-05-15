@@ -11,6 +11,7 @@ final class ActivityTracker: @unchecked Sendable {
     private let maxActivityItems = 50
     private var iconCache: [String: Data] = [:]
     private var activitiesByBundle: [String: ActivityItem] = [:]
+    private var runningAppsByBundle: [String: NSRunningApplication] = [:]
 
     private(set) var activities: [ActivityItem] = []
 
@@ -64,6 +65,7 @@ final class ActivityTracker: @unchecked Sendable {
         let runningApps = NSWorkspace.shared.runningApplications
         let frontmostPID = activePID ?? NSWorkspace.shared.frontmostApplication?.processIdentifier
         var activeBundles: Set<String> = []
+        var updatedRunningApps: [String: NSRunningApplication] = [:]
 
         for app in runningApps {
             guard app.activationPolicy == .regular,
@@ -73,6 +75,7 @@ final class ActivityTracker: @unchecked Sendable {
             else { continue }
 
             activeBundles.insert(bundleId)
+            updatedRunningApps[bundleId] = app
             let isActive = markFrontmostAsActive && app.processIdentifier == frontmostPID
             let iconData = cachedIconData(for: app)
 
@@ -97,6 +100,7 @@ final class ActivityTracker: @unchecked Sendable {
         activitiesByBundle.keys
             .filter { !activeBundles.contains($0) }
             .forEach { activitiesByBundle.removeValue(forKey: $0) }
+        runningAppsByBundle = updatedRunningApps
 
         var updatedActivities = activitiesByBundle.values.sorted { $0.lastActiveTime > $1.lastActiveTime }
 
@@ -150,8 +154,46 @@ final class ActivityTracker: @unchecked Sendable {
     }
 
     func activateApplication(_ activity: ActivityItem) {
-        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: activity.bundleIdentifier).first {
-            app.activate(options: [.activateIgnoringOtherApps])
+        let app = runningAppsByBundle[activity.bundleIdentifier] ??
+            NSRunningApplication.runningApplications(withBundleIdentifier: activity.bundleIdentifier).first
+
+        if let app {
+            app.unhide()
+            app.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+        }
+
+        activateUsingWorkspace(bundleIdentifier: activity.bundleIdentifier)
+        activateUsingAppleScript(bundleIdentifier: activity.bundleIdentifier)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+            let retryApp = self?.runningAppsByBundle[activity.bundleIdentifier] ??
+                NSRunningApplication.runningApplications(withBundleIdentifier: activity.bundleIdentifier).first
+            retryApp?.unhide()
+            retryApp?.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+            self?.activateUsingAppleScript(bundleIdentifier: activity.bundleIdentifier)
+        }
+    }
+
+    private func activateUsingWorkspace(bundleIdentifier: String) {
+        guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
+            return
+        }
+
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)
+    }
+
+    private func activateUsingAppleScript(bundleIdentifier: String) {
+        let escapedBundleIdentifier = bundleIdentifier
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let script = "tell application id \"\(escapedBundleIdentifier)\" to activate"
+        var error: NSDictionary?
+        NSAppleScript(source: script)?.executeAndReturnError(&error)
+
+        if let error {
+            print("Failed to activate \(bundleIdentifier) via AppleScript: \(error)")
         }
     }
 
