@@ -40,14 +40,10 @@
 - Adaptive colors that match system appearance
 - Lightweight and non-intrusive floating window
 
-## Screenshots
-
-<p align="center">
-  <img src="docs/screenshots/expanded.png" width="400" alt="Expanded View">
-  <img src="docs/screenshots/collapsed.png" width="120" alt="Collapsed View">
-</p>
-
 ## Installation
+
+### Download Release (Recommended)
+Download the latest `.app` file from the [Releases](https://github.com/T-H0101/Vortex/releases) page, then double-click to open.
 
 ### Build from Source
 
@@ -57,16 +53,12 @@ git clone https://github.com/T-H0101/Vortex.git
 cd Vortex
 ```
 
-2. Generate the Xcode project:
+2. Open in Xcode and run:
 ```bash
-cd Vortex
-xcodegen generate
+open Vortex/Vortex.xcodeproj
 ```
 
-3. Open in Xcode and run:
-```bash
-open Vortex.xcodeproj
-```
+3. Press `Cmd + R` to build and run
 
 ### Requirements
 - macOS 14.0 (Sonoma) or later
@@ -74,6 +66,9 @@ open Vortex.xcodeproj
 - Swift 5.10 or later
 
 ## Usage
+
+### First Launch
+On first launch, Vortex will appear as a small capsule on your screen.
 
 ### Keyboard Shortcuts
 - **Cmd + 1**: Toggle window visibility
@@ -113,10 +108,3 @@ Contributions are welcome! Feel free to submit issues and pull requests.
 ## License
 
 MIT License - see LICENSE file for details.
-
-## Acknowledgments
-
-- Built with SwiftUI + AppKit
-- Inspired by Apple's Dynamic Island design
-- Uses SwiftData for persistence
-- UserNotifications for reminders
