@@ -40,7 +40,8 @@ struct ActivityMonitorView: View {
     private var tabSelector: some View {
         HStack(spacing: 0) {
             tabButton("Apps", index: 0)
-            tabButton("Browsers", index: 1)
+            tabButton("Web", index: 1)
+            tabButton("Terminals", index: 2)
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
@@ -61,10 +62,15 @@ struct ActivityMonitorView: View {
 
     @ViewBuilder
     private var contentView: some View {
-        if selectedTab == 0 {
+        switch selectedTab {
+        case 0:
             appsListView
-        } else {
-            browsersListView
+        case 1:
+            webListView
+        case 2:
+            terminalsListView
+        default:
+            appsListView
         }
     }
 
@@ -86,14 +92,14 @@ struct ActivityMonitorView: View {
         }
     }
 
-    private var browsersListView: some View {
+    private var webListView: some View {
         VStack(spacing: 0) {
-            browserPicker
-            browserTabsList
+            webBrowserPicker
+            webTabsList
         }
     }
 
-    private var browserPicker: some View {
+    private var webBrowserPicker: some View {
         HStack {
             Picker("Browser", selection: $viewModel.selectedBrowser) {
                 Text("Safari").tag("Safari")
@@ -114,7 +120,7 @@ struct ActivityMonitorView: View {
         .padding(.vertical, 8)
     }
 
-    private var browserTabsList: some View {
+    private var webTabsList: some View {
         ScrollView {
             LazyVStack(spacing: 4) {
                 if viewModel.isLoadingBrowser {
@@ -165,6 +171,75 @@ struct ActivityMonitorView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
+    }
+
+    private var terminalsListView: some View {
+        VStack(spacing: 0) {
+            terminalHeader
+            terminalTabsList
+        }
+    }
+
+    private var terminalHeader: some View {
+        HStack {
+            Text(L("终端", "Terminals"))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.vortexTextSecondary)
+            Spacer()
+            Button(action: {
+                viewModel.selectedBrowser = "Terminal"
+                viewModel.refreshBrowserTabs()
+            }) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 12))
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
+    private var terminalTabsList: some View {
+        ScrollView {
+            LazyVStack(spacing: 4) {
+                if viewModel.isLoadingBrowser {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Spacer()
+                    }
+                    .padding(.vertical, 20)
+                } else if viewModel.browserTabs.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "terminal")
+                            .font(.system(size: 30))
+                            .foregroundColor(.vortexTextSecondary.opacity(0.5))
+                        Text(L("无可用终端", "No terminals"))
+                            .font(.system(size: 13))
+                            .foregroundColor(.vortexTextSecondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 30)
+                } else {
+                    ForEach(viewModel.browserTabs) { tab in
+                        BrowserTabRow(tab: tab) {
+                            viewModel.activateWebPage(tab)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+        .onAppear {
+            viewModel.selectedBrowser = "Terminal"
+            viewModel.refreshBrowserTabs()
+        }
+    }
+
+    private func L(_ zh: String, _ en: String) -> String {
+        return "en" == "en" ? en : zh
     }
 }
 
@@ -234,7 +309,7 @@ struct BrowserTabRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "globe")
+            Image(systemName: tabIcon)
                 .font(.system(size: 16))
                 .foregroundColor(.vortexTextSecondary)
 
@@ -256,8 +331,25 @@ struct BrowserTabRow: View {
         .padding(.vertical, 8)
         .background(Color.vortexMaterialSecondary.opacity(0.5))
         .cornerRadius(6)
+        .contentShape(Rectangle())
         .onTapGesture {
             onActivate()
+        }
+        .onHover { hovering in
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
+    }
+
+    private var tabIcon: String {
+        switch tab.browserName {
+        case "Safari": return "safari"
+        case "Terminal": return "terminal"
+        case "iTerm2": return "terminal"
+        default: return "globe"
         }
     }
 }

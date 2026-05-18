@@ -9,7 +9,7 @@ struct MainTabView: View {
         case settings = 2
     }
 
-    @State private var selectedTab: MainTab = .tasks
+    @AppStorage("selectedTab") private var selectedTabRaw: Int = 0
     @ObservedObject var edgeDocking: EdgeDockingController
     @StateObject private var taskViewModel = TaskSupervisorViewModel()
     @StateObject private var activityViewModel = ActivityMonitorViewModel()
@@ -48,14 +48,7 @@ struct MainTabView: View {
             }
         }
         .frame(width: edgeDocking.contentSize.width, height: edgeDocking.contentSize.height)
-        .background {
-            if edgeDocking.expansionState == .expanded {
-                glassBackground(material: .underWindowBackground, tintOpacity: glassTintOpacity)
-            } else {
-                glassBackground(material: .hudWindow, tintOpacity: max(0.12, glassTintOpacity * 0.8))
-                    .opacity(capsuleOpacity)
-            }
-        }
+        .background(backgroundView)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay {
             if edgeDocking.expansionState == .expanded {
@@ -75,8 +68,8 @@ struct MainTabView: View {
             y: 5
         )
         .opacity(edgeDocking.expansionState == .collapsed ? 0.94 : 1.0)
-        .animation(.easeInOut(duration: dockAnimationDuration), value: edgeDocking.expansionState)
-        .animation(.easeInOut(duration: dockAnimationDuration), value: edgeDocking.dockedSide)
+        .animation(.spring(response: 0.28, dampingFraction: 0.8), value: edgeDocking.expansionState)
+        .animation(.spring(response: 0.28, dampingFraction: 0.8), value: edgeDocking.dockedSide)
         .onHover { hovering in
             edgeDocking.handleHoverChange(isHovering: hovering)
         }
@@ -90,7 +83,7 @@ struct MainTabView: View {
             activityViewModel.stopTracking()
         }
         .onReceive(NotificationCenter.default.publisher(for: .vortexShowSettings)) { _ in
-            selectedTab = .settings
+            selectedTabRaw = MainTab.settings.rawValue
         }
         .onReceive(NotificationCenter.default.publisher(for: .vortexReminderDelivered)) { notification in
             showInAppReminder(from: notification)
@@ -153,6 +146,16 @@ struct MainTabView: View {
         }
     }
 
+    @ViewBuilder
+    private var backgroundView: some View {
+        if edgeDocking.expansionState == .expanded {
+            glassBackground(material: .underWindowBackground, tintOpacity: glassTintOpacity)
+        } else {
+            glassBackground(material: .hudWindow, tintOpacity: max(0.12, glassTintOpacity * 0.8))
+                .opacity(capsuleOpacity)
+        }
+    }
+
     private var headerBar: some View {
         HStack(spacing: 12) {
             tabSelector
@@ -182,7 +185,7 @@ struct MainTabView: View {
 
     private func tabButton(_ title: String, icon: String, tab: MainTab) -> some View {
         let isCompactChinese = appLanguage != "en"
-        return Button(action: { selectedTab = tab }) {
+        return Button(action: { selectedTabRaw = tab.rawValue }) {
             HStack(spacing: 6) {
                 if !isCompactChinese {
                     Image(systemName: icon)
@@ -191,10 +194,10 @@ struct MainTabView: View {
                 Text(title)
                     .font(.system(size: isCompactChinese ? 11 : 12, weight: .medium))
             }
-            .foregroundColor(selectedTab == tab ? .primary : .secondary)
+            .foregroundColor(selectedTabRaw == tab.rawValue ? .primary : .secondary)
             .padding(.horizontal, isCompactChinese ? 8 : 10)
             .padding(.vertical, 6)
-            .background(selectedTab == tab ? Color.primary.opacity(0.15) : Color.clear)
+            .background(selectedTabRaw == tab.rawValue ? Color.primary.opacity(0.15) : Color.clear)
             .cornerRadius(6)
         }
         .buttonStyle(.plain)
@@ -203,7 +206,7 @@ struct MainTabView: View {
     @ViewBuilder
     private var tabContent: some View {
         VStack(spacing: 0) {
-            switch selectedTab {
+            switch MainTab(rawValue: selectedTabRaw) {
             case .tasks:
                 TaskTabView(viewModel: taskViewModel, appLanguage: appLanguage)
             case .activity:
@@ -227,6 +230,8 @@ struct MainTabView: View {
                     glassTintOpacity: $glassTintOpacity,
                     systemNotificationsEnabled: $systemNotificationsEnabled
                 )
+            case .none:
+                EmptyView()
             }
         }
     }
@@ -261,7 +266,7 @@ struct MainTabView: View {
             Spacer()
 
             Button(action: {
-                selectedTab = .settings
+                selectedTabRaw = MainTab.settings.rawValue
                 edgeDocking.expandWindow()
             }) {
                 Image(systemName: "gearshape")
@@ -291,7 +296,7 @@ struct MainTabView: View {
             }
 
             Button(action: {
-                selectedTab = .settings
+                selectedTabRaw = MainTab.settings.rawValue
                 edgeDocking.expandWindow()
             }) {
                 Image(systemName: "gearshape.fill")
@@ -340,13 +345,13 @@ struct MainTabView: View {
         let title = notification.userInfo?["title"] as? String ?? L("任务提醒", "Task Reminder")
         let reminder = InAppReminder(title: title, message: L("该处理这个任务了", "Time to handle this task"))
 
-        withAnimation(.easeInOut(duration: 0.18)) {
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
             visibleReminder = reminder
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 4.2) {
             guard visibleReminder?.id == reminder.id else { return }
-            withAnimation(.easeInOut(duration: 0.18)) {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
                 visibleReminder = nil
             }
         }
@@ -359,7 +364,7 @@ struct MainTabView: View {
                 .padding(24)
                 .transition(.scale(scale: 0.94).combined(with: .opacity))
                 .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.18)) {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
                         visibleReminder = nil
                     }
                 }
@@ -481,7 +486,7 @@ struct TaskTabView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.secondary)
                     Spacer()
-                    Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isPresentingComposer = true } }) {
+                    Button(action: { withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) { isPresentingComposer = true } }) {
                         Image(systemName: "plus")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.white)
@@ -523,17 +528,13 @@ struct TaskTabView: View {
                 Color.black.opacity(0.24)
                     .ignoresSafeArea()
                     .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isPresentingComposer = false
-                        }
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) { isPresentingComposer = false }
                     }
 
                 TaskComposerView(
                     appLanguage: appLanguage,
                     onCancel: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isPresentingComposer = false
-                        }
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) { isPresentingComposer = false }
                     },
                     onCreate: { title, dueDate, scheduleType, priority, reminderFrequency, notes in
                         viewModel.createTask(
@@ -544,9 +545,7 @@ struct TaskTabView: View {
                             reminderFrequency: reminderFrequency,
                             notes: notes
                         )
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isPresentingComposer = false
-                        }
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) { isPresentingComposer = false }
                     }
                 )
                 .background(
@@ -560,7 +559,7 @@ struct TaskTabView: View {
                 .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 6)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: isPresentingComposer)
+        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isPresentingComposer)
     }
 
     private var overdueWarningBanner: some View {
@@ -675,6 +674,14 @@ struct TaskRowCompact: View {
                 .stroke(task.isOverdue ? Color.red.opacity(0.35) : Color.clear, lineWidth: 0.8)
         )
         .cornerRadius(8)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
     }
 
     private func priorityLabel(_ priority: TaskPriority, appLanguage: String) -> String {
@@ -728,6 +735,14 @@ struct TaskComposerView: View {
 
             TextField(L("任务标题", "Task title"), text: $title)
                 .textFieldStyle(.roundedBorder)
+                .focusable()
+                .onKeyPress(.return) {
+                    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        onCreate(title, selectedDueDate, scheduleType, priority, reminderFrequency, notes)
+                    }
+                    return .handled
+                }
 
             deadlinePickerGrid
 
@@ -762,15 +777,21 @@ struct TaskComposerView: View {
                 Button(L("取消", "Cancel")) {
                     onCancel()
                 }
+                .keyboardShortcut(.cancelAction)
                 Button(L("添加", "Add")) {
                     onCreate(title, selectedDueDate, scheduleType, priority, reminderFrequency, notes)
                 }
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
                 .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(16)
         .frame(width: 420)
+        .onKeyPress(.escape) {
+            onCancel()
+            return .handled
+        }
     }
 
     private func priorityLabel(_ level: TaskPriority) -> String {
@@ -892,6 +913,7 @@ struct ActivityTabView: View {
                 Picker("", selection: $selectedSection) {
                     Text(L("最近应用", "Recent apps")).tag(0)
                     Text(L("最近网页", "Recent web pages")).tag(1)
+                    Text(L("最近终端", "Recent terminals")).tag(2)
                 }
                 .pickerStyle(.segmented)
 
@@ -908,37 +930,44 @@ struct ActivityTabView: View {
 
             ScrollView {
                 LazyVStack(spacing: 4) {
-                    if selectedSection == 0 {
+                    switch selectedSection {
+                    case 0:
                         ForEach(viewModel.activities, id: \.id) { activity in
                             ActivityRowCompact(activity: activity) {
                                 viewModel.activateActivity(activity)
                             }
                         }
-                    } else if viewModel.isLoadingBrowser {
-                        HStack {
-                            Spacer()
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Spacer()
-                        }
-                        .padding(.vertical, 20)
-                    } else if viewModel.recentWebPages.isEmpty {
-                        VStack(spacing: 8) {
-                            Image(systemName: "globe")
-                                .font(.system(size: 26))
-                                .foregroundColor(.secondary.opacity(0.5))
-                            Text(L("暂无最近网页", "No recent web pages"))
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
-                    } else {
-                        ForEach(viewModel.recentWebPages) { page in
-                            WebPageRow(tab: page) {
-                                viewModel.activateWebPage(page)
+                    case 1:
+                        if viewModel.isLoadingBrowser {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Spacer()
+                            }
+                            .padding(.vertical, 20)
+                        } else if viewModel.recentWebPages.isEmpty {
+                            VStack(spacing: 8) {
+                                Image(systemName: "globe")
+                                    .font(.system(size: 26))
+                                    .foregroundColor(.secondary.opacity(0.5))
+                                Text(L("暂无最近网页", "No recent web pages"))
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 20)
+                        } else {
+                            ForEach(viewModel.recentWebPages) { page in
+                                WebPageRow(tab: page) {
+                                    viewModel.activateWebPage(page)
+                                }
                             }
                         }
+                    case 2:
+                        terminalSection
+                    default:
+                        EmptyView()
                     }
                 }
                 .padding(.horizontal, 12)
@@ -948,16 +977,67 @@ struct ActivityTabView: View {
         .onAppear {
             refreshCurrentSection()
         }
-        .onChange(of: selectedSection) { _, _ in
+        .onChange(of: selectedSection) { _, newValue in
+            if newValue == 1 {
+                viewModel.selectedBrowser = "Safari"
+            } else if newValue == 2 {
+                viewModel.selectedBrowser = "Terminal"
+            }
             refreshCurrentSection()
         }
     }
 
+    private var terminalSection: some View {
+        VStack(spacing: 0) {
+            if viewModel.isLoadingBrowser {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Spacer()
+                }
+                .padding(.vertical, 20)
+            } else if viewModel.browserTabs.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 26))
+                        .foregroundColor(.secondary.opacity(0.5))
+                    Text(L("暂无最近终端", "No recent terminals"))
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                    Button(action: {
+                        viewModel.selectedBrowser = "Terminal"
+                        viewModel.refreshBrowserTabs()
+                    }) {
+                        Text(L("刷新", "Refresh"))
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            } else {
+                ForEach(viewModel.browserTabs) { tab in
+                    BrowserTabRow(tab: tab) {
+                        viewModel.activateWebPage(tab)
+                    }
+                }
+            }
+        }
+    }
+
     private func refreshCurrentSection() {
-        if selectedSection == 0 {
+        switch selectedSection {
+        case 0:
             viewModel.refreshActivities()
-        } else {
+        case 1:
+            viewModel.selectedBrowser = "Safari"
             viewModel.refreshRecentWebPages()
+        case 2:
+            viewModel.selectedBrowser = "Terminal"
+            viewModel.refreshBrowserTabs()
+        default:
+            break
         }
     }
 
@@ -1006,8 +1086,16 @@ struct ActivityRowCompact: View {
         .padding(.vertical, 6)
         .background(Color.primary.opacity(0.05))
         .cornerRadius(6)
+        .contentShape(Rectangle())
         .onTapGesture {
             onActivate()
+        }
+        .onHover { hovering in
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
         }
     }
 }
@@ -1049,8 +1137,16 @@ struct WebPageRow: View {
         .padding(.vertical, 8)
         .background(Color.primary.opacity(0.05))
         .cornerRadius(6)
+        .contentShape(Rectangle())
         .onTapGesture {
             onActivate()
+        }
+        .onHover { hovering in
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
         }
     }
 }

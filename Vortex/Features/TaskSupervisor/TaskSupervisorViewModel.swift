@@ -9,9 +9,14 @@ final class TaskSupervisorViewModel: ObservableObject {
     @Published var selectedDate: Date = Date()
     @Published var isAddingTask: Bool = false
     @Published var editingTask: TaskItem?
+    @Published var isSaving: Bool = false
 
     private var modelContext: ModelContext?
     private var modelContainerObserver: NSObjectProtocol?
+    private var cachedTodayTasks: [TaskItem]?
+    private var cachedOverdueTasks: [TaskItem]?
+    private var cachedCompletedTasks: [TaskItem]?
+    private var tasksCacheDate: Date?
 
     func setup(modelContext: ModelContext) {
         self.modelContext = modelContext
@@ -35,19 +40,24 @@ final class TaskSupervisorViewModel: ObservableObject {
     func fetchTasks() {
         guard let modelContext = modelContext else { return }
 
-        // Force the context to process any pending changes from other contexts
-        modelContext.processPendingChanges()
-
         let descriptor = FetchDescriptor<TaskItem>(
             sortBy: [SortDescriptor(\.dueDate, order: .forward)]
         )
 
         do {
             tasks = sortTasks(try modelContext.fetch(descriptor))
+            invalidateCache()
             rescheduleActiveReminders()
         } catch {
             print("Failed to fetch tasks: \(error)")
         }
+    }
+
+    private func invalidateCache() {
+        cachedTodayTasks = nil
+        cachedOverdueTasks = nil
+        cachedCompletedTasks = nil
+        tasksCacheDate = nil
     }
 
     func addTask() {
@@ -55,6 +65,7 @@ final class TaskSupervisorViewModel: ObservableObject {
         let trimmedTitle = newTaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { return }
 
+        isSaving = true
         let task = TaskItem(
             title: trimmedTitle,
             dueDate: selectedDate,
@@ -72,6 +83,7 @@ final class TaskSupervisorViewModel: ObservableObject {
         } catch {
             print("Failed to save task: \(error)")
         }
+        isSaving = false
     }
 
     func createTask(
@@ -86,6 +98,7 @@ final class TaskSupervisorViewModel: ObservableObject {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { return }
 
+        isSaving = true
         let reminderDate: Date?
         switch reminderFrequency {
         case .none:
@@ -119,6 +132,7 @@ final class TaskSupervisorViewModel: ObservableObject {
         } catch {
             print("Failed to create task: \(error)")
         }
+        isSaving = false
     }
 
     func toggleTaskCompletion(_ task: TaskItem) {
@@ -169,16 +183,31 @@ final class TaskSupervisorViewModel: ObservableObject {
     }
 
     var todayTasks: [TaskItem] {
-        let calendar = Calendar.current
-        return tasks.filter { calendar.isDateInToday($0.dueDate) }
+        let now = Date()
+        if cachedTodayTasks == nil || tasksCacheDate == nil || now.timeIntervalSince(tasksCacheDate!) > 1.0 {
+            let calendar = Calendar.current
+            cachedTodayTasks = tasks.filter { calendar.isDateInToday($0.dueDate) }
+            tasksCacheDate = now
+        }
+        return cachedTodayTasks!
     }
 
     var overdueTasks: [TaskItem] {
-        tasks.filter { $0.isOverdue }
+        let now = Date()
+        if cachedOverdueTasks == nil || tasksCacheDate == nil || now.timeIntervalSince(tasksCacheDate!) > 1.0 {
+            cachedOverdueTasks = tasks.filter { $0.isOverdue }
+            tasksCacheDate = now
+        }
+        return cachedOverdueTasks!
     }
 
     var completedTasks: [TaskItem] {
-        sortTasks(tasks.filter { $0.isCompleted })
+        let now = Date()
+        if cachedCompletedTasks == nil || tasksCacheDate == nil || now.timeIntervalSince(tasksCacheDate!) > 1.0 {
+            cachedCompletedTasks = sortTasks(tasks.filter { $0.isCompleted })
+            tasksCacheDate = now
+        }
+        return cachedCompletedTasks!
     }
 
     private func sortTasks(_ items: [TaskItem]) -> [TaskItem] {

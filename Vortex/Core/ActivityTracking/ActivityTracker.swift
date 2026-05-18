@@ -12,6 +12,8 @@ final class ActivityTracker: @unchecked Sendable {
     private var iconCache: [String: Data] = [:]
     private var activitiesByBundle: [String: ActivityItem] = [:]
     private var runningAppsByBundle: [String: NSRunningApplication] = [:]
+    private var activationDebounceWorkItem: DispatchWorkItem?
+    private let debounceInterval: TimeInterval = 0.3
 
     private(set) var activities: [ActivityItem] = []
 
@@ -57,8 +59,15 @@ final class ActivityTracker: @unchecked Sendable {
     }
 
     private func handleActivation(_ notification: Notification) {
+        activationDebounceWorkItem?.cancel()
+
         let activePID = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.processIdentifier
-        captureRunningApplications(markFrontmostAsActive: true, activePID: activePID)
+
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.captureRunningApplications(markFrontmostAsActive: true, activePID: activePID)
+        }
+        activationDebounceWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + debounceInterval, execute: workItem)
     }
 
     private func captureRunningApplications(markFrontmostAsActive: Bool, activePID: pid_t? = nil) {
