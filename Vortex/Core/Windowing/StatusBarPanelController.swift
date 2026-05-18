@@ -341,7 +341,10 @@ struct TaskComposerStandaloneView: View {
         }
     }
 
-    private func L(_ zh: String, _ en: String) -> String { "en" == "en" ? en : zh }
+    private func L(_ zh: String, _ en: String) -> String {
+        let language = UserDefaults.standard.string(forKey: "appLanguage") ?? "zh-Hans"
+        return language == "en" ? en : zh
+    }
 
     private var daysInSelectedMonth: Int {
         var components = DateComponents()
@@ -483,7 +486,10 @@ struct TaskListStandaloneView: View {
         .padding(.vertical, 30)
     }
 
-    private func L(_ zh: String, _ en: String) -> String { "en" == "en" ? en : zh }
+    private func L(_ zh: String, _ en: String) -> String {
+        let language = UserDefaults.standard.string(forKey: "appLanguage") ?? "zh-Hans"
+        return language == "en" ? en : zh
+    }
 }
 
 struct TaskListRowView: View {
@@ -601,13 +607,23 @@ struct ActivityStandaloneView: View {
         HStack(spacing: 0) {
             tabButton(L("应用", "Apps"), index: 0)
             tabButton(L("网页", "Web"), index: 1)
+            tabButton(L("终端", "Terminals"), index: 2)
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
     }
 
     private func tabButton(_ title: String, index: Int) -> some View {
-        Button(action: { selectedTab = index }) {
+        Button(action: {
+            selectedTab = index
+            if index == 1 {
+                viewModel.selectedBrowser = "Safari"
+                viewModel.refreshBrowserTabs()
+            } else if index == 2 {
+                viewModel.selectedBrowser = "Terminal"
+                viewModel.refreshBrowserTabs()
+            }
+        }) {
             Text(title)
                 .font(.system(size: 13, weight: selectedTab == index ? .medium : .regular))
                 .foregroundColor(selectedTab == index ? .primary : .secondary)
@@ -621,10 +637,15 @@ struct ActivityStandaloneView: View {
 
     @ViewBuilder
     private var contentView: some View {
-        if selectedTab == 0 {
+        switch selectedTab {
+        case 0:
             appsListView
-        } else {
-            browsersListView
+        case 1:
+            webListView
+        case 2:
+            terminalsListView
+        default:
+            appsListView
         }
     }
 
@@ -644,23 +665,106 @@ struct ActivityStandaloneView: View {
         }
     }
 
-    private var browsersListView: some View {
-        ScrollView {
-            LazyVStack(spacing: 4) {
-                ForEach(viewModel.browserTabs) { tab in
-                    BrowserTabRowStandalone(tab: tab) {
-                        onClose()
-                        DispatchQueue.main.async {
-                            viewModel.activateWebPage(tab)
+    private var webListView: some View {
+        VStack(spacing: 0) {
+            webBrowserPicker
+            ScrollView {
+                if viewModel.browserTabs.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "globe")
+                            .font(.system(size: 30))
+                            .foregroundColor(.secondary.opacity(0.5))
+                        Text(L("无可用网页", "No web pages"))
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                        Button(action: { viewModel.refreshBrowserTabs() }) {
+                            Text(L("刷新", "Refresh"))
+                                .font(.system(size: 12))
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else {
+                    LazyVStack(spacing: 4) {
+                        ForEach(viewModel.browserTabs) { tab in
+                            BrowserTabRowStandalone(tab: tab) {
+                                onClose()
+                                DispatchQueue.main.async {
+                                    viewModel.activateWebPage(tab)
+                                }
+                            }
                         }
                     }
                 }
             }
-            .padding(12)
+        }
+        .padding(12)
+        .onAppear {
+            viewModel.selectedBrowser = "Safari"
+            viewModel.refreshBrowserTabs()
         }
     }
 
-    private func L(_ zh: String, _ en: String) -> String { "en" == "en" ? en : zh }
+    private var webBrowserPicker: some View {
+        Picker(L("浏览器", "Browser"), selection: $viewModel.selectedBrowser) {
+            Text("Safari").tag("Safari")
+            Text("Chrome").tag("Chrome")
+        }
+        .pickerStyle(.segmented)
+        .padding(.bottom, 8)
+        .onChange(of: viewModel.selectedBrowser) { _, _ in
+            viewModel.refreshBrowserTabs()
+        }
+    }
+
+    private var terminalsListView: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                if viewModel.browserTabs.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "terminal")
+                            .font(.system(size: 30))
+                            .foregroundColor(.secondary.opacity(0.5))
+                        Text(L("无可用终端", "No terminals"))
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                        Button(action: {
+                            viewModel.selectedBrowser = "Terminal"
+                            viewModel.refreshBrowserTabs()
+                        }) {
+                            Text(L("刷新", "Refresh"))
+                                .font(.system(size: 12))
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else {
+                    LazyVStack(spacing: 4) {
+                        ForEach(viewModel.browserTabs) { tab in
+                            BrowserTabRowStandalone(tab: tab) {
+                                onClose()
+                                DispatchQueue.main.async {
+                                    viewModel.activateWebPage(tab)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .onAppear {
+            viewModel.selectedBrowser = "Terminal"
+            viewModel.refreshBrowserTabs()
+        }
+    }
+
+    private func L(_ zh: String, _ en: String) -> String {
+        let language = UserDefaults.standard.string(forKey: "appLanguage") ?? "zh-Hans"
+        return language == "en" ? en : zh
+    }
 }
 
 struct BrowserTabRowStandalone: View {

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import AppKit
 
 @Model
 final class ActivityItem {
@@ -49,5 +50,10 @@ extension ActivityItem {
         } else {
             return "\(Int(interval / 86400))d ago"
         }
+    }
+
+    var nsImage: NSImage? {
+        guard let data = appIcon else { return nil }
+        return NSImage(data: data)
     }
 }
